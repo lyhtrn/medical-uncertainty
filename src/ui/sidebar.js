@@ -175,7 +175,7 @@ export async function selectStructureAnywhere(partId) {
     }
   }
 
-  selectPartById(partId, state.viewer);
+  return selectPartById(partId, state.viewer);
 }
 
 // Hiding a system is instant, but its buffers are only released if it stays

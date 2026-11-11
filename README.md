@@ -6,7 +6,7 @@ An interactive 3D atlas of human anatomy: 2827 structures across seven systems,
 built on the [Z-Anatomy](https://www.z-anatomy.com/) dataset and rendered in the
 browser with three.js.
 
-Live: <https://nqwrc.github.io/3d-anatomy/>
+Live: <https://lyhtrn.github.io/medical-uncertainty/>
 
 ## Running it
 
@@ -22,6 +22,24 @@ npm run build # writes dist/, about 21 MB
 
 `npm ci` is deliberate: `package.json` and the lockfile are kept in sync, and
 the lockfile is the source of truth for the stack that has actually been tested.
+
+## Document review prototype
+
+The Documents panel accepts UTF-8 plain-text (`.txt`) and Markdown (`.md`)
+files up to 2 MB. Its first-pass, English keyword rules suggest symptom,
+investigation, or management findings and look for English anatomical names in
+the atlas catalog, plus a small set of explicit body-region terms. It keeps the
+source excerpt verbatim apart from surrounding whitespace and reads an optional
+`Date:`, `Visit date:`, or `Report date:` field.
+
+PDF, DOCX, image/scanned reports, OCR, non-English extraction, clinical
+interpretation, and diagnosis are not implemented. Extraction is provisional:
+reviewers must confirm a finding before a structure receives a medical status.
+A body-region-only mention creates a labeled region reference in the viewer;
+it does not recolor anatomy meshes. Files are parsed in the browser and are
+never uploaded. Document names, dates, extracted excerpts, decisions, and
+confirmed statuses persist in localStorage; the original uploaded file contents
+are not retained by this prototype.
 
 ## How the models work
 

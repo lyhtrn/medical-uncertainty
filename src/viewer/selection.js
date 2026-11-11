@@ -6,6 +6,7 @@ import { highlightMesh, clearHighlight, ghostAllExcept, clearGhost, isolatePart,
 import { focusOnMesh } from './camera.js';
 import { showCallout, hideCallout } from '../ui/callout.js';
 import { loadDefinitions } from '../data/anatomy.js';
+import { confirmedFindingsForPart } from '../state/documentReview.js';
 
 // Distinguishes a tap from the end of an orbit gesture.
 const TAP_MAX_MOVE_PX = 10;
@@ -351,6 +352,7 @@ function showInfoPanel(partData) {
         `).join('')}
       </div>
     </section>
+    ${confirmedEvidenceMarkup(partData.id)}
     ${relationMarkup(partData.id, lang)}
     <div class="structure-description" data-definition>${escapeHtml(translate('loading_definition', lang))}</div>
   `;
@@ -372,6 +374,23 @@ function showInfoPanel(partData) {
   });
 
   fillDefinition(partData, lang);
+}
+
+function confirmedEvidenceMarkup(partId) {
+  const findings = confirmedFindingsForPart(partId);
+  if (!findings.length) return '';
+
+  return `
+    <section class="confirmed-evidence" aria-labelledby="confirmedEvidenceTitle">
+      <h4 id="confirmedEvidenceTitle">Confirmed document evidence</h4>
+      ${findings.map(finding => `
+        <article>
+          <small>${escapeHtml(finding.document?.name || 'Document')} · ${escapeHtml(finding.document?.date || 'Date not detected')}</small>
+          <blockquote>${escapeHtml(finding.excerpt)}</blockquote>
+        </article>
+      `).join('')}
+    </section>
+  `;
 }
 
 // Z-Anatomy's collections are flat, so there is no tree to show — but the glTF

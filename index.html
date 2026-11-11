@@ -60,6 +60,7 @@
             <div class="loading-spinner"></div>
             <span class="loading-text">Loading 3D model...</span>
           </div>
+          <div id="regionEvidenceOverlay" class="region-evidence-overlay" aria-live="polite"></div>
 
           <!-- Preset views float over the canvas; per-structure actions live on
                the callout and in the bottom bar, not duplicated here. -->
@@ -76,12 +77,16 @@
       <!-- Sidebar - Info Panel -->
       <aside class="sidebar sidebar-info" id="infoSidebar">
         <div class="sidebar-header">
-          <h2>Structure details</h2>
+          <h2>Review & details</h2>
           <button class="sidebar-toggle" id="infoToggle" aria-label="Close information">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <div class="sidebar-content" id="infoContent">
+        <div class="panel-tabs" role="tablist" aria-label="Review panels">
+          <button type="button" class="panel-tab" id="structureTab" role="tab" data-info-tab="structure" aria-controls="infoContent" aria-selected="true">Structure</button>
+          <button type="button" class="panel-tab" id="documentsTab" role="tab" data-info-tab="documents" aria-controls="documentsPanel" aria-selected="false">Documents</button>
+        </div>
+        <div class="sidebar-content" id="infoContent" data-info-panel="structure" role="tabpanel" aria-labelledby="structureTab">
           <div class="info-placeholder">
             <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
@@ -97,6 +102,38 @@
           </div>
           <div id="structureInfo" class="structure-info hidden"></div>
         </div>
+        <section class="sidebar-content document-review" id="documentsPanel" data-info-panel="documents" role="tabpanel" aria-labelledby="documentsTab" hidden>
+          <div class="document-intro">
+            <p class="document-caution">Extraction suggestions are provisional and are not medical diagnoses. Review each excerpt and location before confirming.</p>
+            <p class="document-privacy">Files are read in this browser. Document names, dates, excerpts, and review decisions are stored locally; nothing is sent to an external service.</p>
+          </div>
+          <label class="document-dropzone" id="documentDropzone" for="documentInput">
+            <input id="documentInput" type="file" accept=".txt,.md,text/plain,text/markdown" multiple>
+            <span class="dropzone-icon" aria-hidden="true">+</span>
+            <strong>Drop a report here or choose files</strong>
+            <small>English plain text or Markdown · up to 2 MB per file</small>
+          </label>
+          <button type="button" class="sample-report-button" id="loadSampleReport">Load fictional sample report</button>
+          <details class="sample-report-preview">
+            <summary>Preview the fictional report</summary>
+            <pre id="sampleReportPreview"></pre>
+          </details>
+          <p class="document-status-message" id="documentStatus" role="status" aria-live="polite"></p>
+          <div class="status-legend document-status-legend" aria-label="Medical status legend">
+            <span><i style="--status-color: #A9B4B8"></i>No recorded concern</span>
+            <span><i style="--status-color: #E95858"></i>Documented problem</span>
+            <span><i style="--status-color: #F5A34C"></i>Management in progress</span>
+            <span><i style="--status-color: #45B9B4"></i>Currently investigating</span>
+          </div>
+          <section class="document-list-section">
+            <h3>Documents</h3>
+            <div id="reviewDocuments"></div>
+          </section>
+          <section class="document-findings-section">
+            <h3>Findings for review</h3>
+            <div id="documentFindings"></div>
+          </section>
+        </section>
       </aside>
     </main>
 
