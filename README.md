@@ -26,20 +26,26 @@ the lockfile is the source of truth for the stack that has actually been tested.
 ## Document review prototype
 
 The Documents panel accepts UTF-8 plain-text (`.txt`) and Markdown (`.md`)
-files up to 2 MB. Its first-pass, English keyword rules suggest symptom,
-investigation, or management findings and look for English anatomical names in
-the atlas catalog, plus a small set of explicit body-region terms. It keeps the
-source excerpt verbatim apart from surrounding whitespace and reads an optional
-`Date:`, `Visit date:`, or `Report date:` field.
+files up to 2 MB and also accepts pasted report text. Its first-pass, English
+keyword rules suggest symptom, investigation, or management findings and look
+for English anatomical names in the atlas catalog, plus a small set of explicit
+body-region terms. It keeps the source excerpt verbatim apart from surrounding
+whitespace and reads an optional `Date:`, `Visit date:`, or `Report date:` field.
 
 PDF, DOCX, image/scanned reports, OCR, non-English extraction, clinical
 interpretation, and diagnosis are not implemented. Extraction is provisional:
 reviewers must confirm a finding before a structure receives a medical status.
-A body-region-only mention creates a labeled region reference in the viewer;
-it does not recolor anatomy meshes. Files are parsed in the browser and are
-never uploaded. Document names, dates, extracted excerpts, decisions, and
-confirmed statuses persist in localStorage; the original uploaded file contents
-are not retained by this prototype.
+Only an unambiguous single structure/laterality match is proposed for a mesh.
+Ambiguous or multiple matches are shown for review and do not color a mesh; to
+color one, the reviewer must edit the match to an exact atlas structure.
+Meshes default to grey; confirmed document findings color them red (documented
+problem), orange (management in progress), or teal (currently investigating).
+Selecting a colored structure shows its confirmed source excerpt. A
+body-region-only mention creates a labeled region reference in the viewer; it
+does not recolor anatomy meshes.
+Files are parsed in the browser and are never uploaded. Document names, dates,
+extracted excerpts, decisions, and confirmed statuses persist in localStorage;
+the original report text is not retained by this prototype.
 
 ## How the models work
 
@@ -64,8 +70,9 @@ structures to the model root (preserving the world transform) and records the
 containment relation separately, which is what the details panel shows.
 
 **Materials are shared.** The seven GLBs ship 65 materials (47 unique names)
-for thousands of meshes. The loader keeps that sharing and clones a material
-only when a single mesh is modified, restoring the shared reference afterwards.
+for thousands of meshes. The loader keeps sharing the source materials and
+medical-status variants; it clones a mesh's material only when that mesh needs
+an independent appearance, restoring the base material when that state clears.
 
 ### Regenerating the models
 

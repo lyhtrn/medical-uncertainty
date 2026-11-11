@@ -2,11 +2,12 @@
 import * as THREE from 'three';
 import { state, setSelectedPart, getStructureInfo, translate, getMedicalStatus, MEDICAL_STATUSES } from '../state/store.js';
 import { getMeshRegistry, getPickTargets, getStructure } from './loadModel.js';
-import { highlightMesh, clearHighlight, ghostAllExcept, clearGhost, isolatePart, hidePart, setPartMedicalStatus } from './visibility.js';
+import { highlightMesh, clearHighlight, ghostAllExcept, clearGhost, isolatePart, hidePart } from './visibility.js';
 import { focusOnMesh } from './camera.js';
 import { showCallout, hideCallout } from '../ui/callout.js';
 import { loadDefinitions } from '../data/anatomy.js';
 import { confirmedFindingsForPart } from '../state/documentReview.js';
+import { activateInfoPanelTab } from '../ui/panelTabs.js';
 
 // Distinguishes a tap from the end of an orbit gesture.
 const TAP_MAX_MOVE_PX = 10;
@@ -312,6 +313,7 @@ export function deselectPart() {
 }
 
 function showInfoPanel(partData) {
+  activateInfoPanelTab('structure');
   const placeholder = document.querySelector('.info-placeholder');
   const structureInfo = document.getElementById('structureInfo');
 
@@ -341,15 +343,7 @@ function showInfoPanel(partData) {
     <section class="medical-status" aria-labelledby="medicalStatusTitle">
       <div class="medical-status-heading">
         <h4 id="medicalStatusTitle">Medical status</h4>
-        <span data-current-status>${escapeHtml(MEDICAL_STATUSES.find(status => status.id === getMedicalStatus(partData.id))?.label || 'Not assigned')}</span>
-      </div>
-      <div class="medical-status-options" role="group" aria-label="Assign a medical status">
-        ${MEDICAL_STATUSES.map(status => `
-          <button type="button" class="medical-status-option" data-medical-status="${status.id}" aria-pressed="${getMedicalStatus(partData.id) === status.id}" style="--status-color: ${status.color}">
-            <span class="medical-status-swatch" aria-hidden="true"></span>
-            <span>${escapeHtml(status.label)}</span>
-          </button>
-        `).join('')}
+        <span data-current-status>${escapeHtml(MEDICAL_STATUSES.find(status => status.id === getMedicalStatus(partData.id))?.label || MEDICAL_STATUSES[0].label)}</span>
       </div>
     </section>
     ${confirmedEvidenceMarkup(partData.id)}
@@ -359,18 +353,6 @@ function showInfoPanel(partData) {
 
   structureInfo.querySelectorAll('[data-relation]').forEach(link => {
     link.addEventListener('click', () => selectPartById(link.dataset.relation, state.viewer));
-  });
-
-  structureInfo.querySelectorAll('[data-medical-status]').forEach(button => {
-    button.addEventListener('click', () => {
-      const statusId = button.dataset.medicalStatus;
-      if (!setPartMedicalStatus(partData.id, statusId)) return;
-
-      structureInfo.querySelectorAll('[data-medical-status]').forEach(option => {
-        option.setAttribute('aria-pressed', String(option.dataset.medicalStatus === statusId));
-      });
-      structureInfo.querySelector('[data-current-status]').textContent = MEDICAL_STATUSES.find(status => status.id === statusId)?.label || 'Not assigned';
-    });
   });
 
   fillDefinition(partData, lang);

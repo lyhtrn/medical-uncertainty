@@ -5,17 +5,17 @@ import { loadSystems } from './viewer/loadModel.js';
 import { initSelection } from './viewer/selection.js';
 import { initUI } from './ui/sidebar.js';
 import { initDocumentReview } from './ui/documents.js';
-import { initInfoPanelTabs } from './ui/panelTabs.js';
-import { state, setViewer, setPartsData, setSystemsData, setTranslations, setSearchIndex, subscribe } from './state/store.js';
+import { setViewer, setPartsData, setSystemsData, setTranslations, setSearchIndex, subscribe } from './state/store.js';
 import { readState, storedState, applyState, scheduleStateWrite } from './state/urlState.js';
 import { loadModel } from './viewer/loadModel.js';
 import { selectPartById } from './viewer/selection.js';
 import { showPart, hidePart, setPartTransparency, isolatePart } from './viewer/visibility.js';
 import { loadSystemsData, loadLexicon, loadDefinitions, buildPartsData, DEFAULT_SYSTEM } from './data/anatomy.js';
 import { translationsIt, translationsEn } from './data/translations.js';
+import { initInfoPanelTabsWhenReady } from './ui/panelTabs.js';
 
 setTranslations({ it: translationsIt, en: translationsEn });
-initInfoPanelTabs();
+initInfoPanelTabsWhenReady();
 
 function buildSearchIndex(parts) {
   const index = [];
@@ -59,6 +59,8 @@ async function init() {
     setSearchIndex(buildSearchIndex(partsData));
     console.log(`[main] Anatomy data ready: ${Object.keys(partsData).length} structures`);
 
+    if (viewer) initDocumentReview(viewer, partsData);
+
     if (viewer) {
       // A shared link wins over the default view; a reload falls back to
       // whatever was last looked at.
@@ -87,7 +89,6 @@ async function init() {
     }
     if (viewer) {
       await initUI(viewer);
-      initDocumentReview(viewer, state.partsData);
       initSelection(viewer);
       trackViewState(viewer);
     }

@@ -3,8 +3,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
-import { state, setLoadingSystem, getMedicalStatus, MEDICAL_STATUSES } from '../state/store.js';
+import { state, setLoadingSystem, getMedicalStatus } from '../state/store.js';
 import { asset } from '../utils/paths.js';
+import { medicalStatusColor } from './medicalColor.js';
 
 // Without an acceleration structure, picking cost grows with the triangle
 // count: 10.4M triangles tested per pointer event across seven systems.
@@ -25,6 +26,7 @@ let structures = new Map(); // Map<partId, { node, systemId, parentId, childIds,
 let systemRegistry = new Map(); // Map<systemId, node[]>
 let modelRoots = new Map(); // Map<systemId, gltf.scene>
 let loadingManager = new THREE.LoadingManager();
+const statusMaterialVariants = new WeakMap();
 
 export function getMeshRegistry() {
   return meshRegistry;
@@ -205,20 +207,31 @@ function processModel(model, systemId, viewer) {
     const owner = ownerId && structures.get(ownerId);
     if (owner) owner.ownMeshes.push(child);
 
-    const status = MEDICAL_STATUSES.find(entry => entry.id === getMedicalStatus(ownerId));
-    if (status) {
-      child.material = Array.isArray(child.material)
-        ? child.material.map(material => material.clone())
-        : child.material.clone();
-      child.userData.ownsMaterial = true;
-      (Array.isArray(child.material) ? child.material : [child.material]).forEach(material => {
-        if (material.color) material.color.set(status.color);
-      });
-    }
+    const statusId = getMedicalStatus(ownerId);
+    child.material = Array.isArray(child.material)
+      ? child.material.map(material => statusMaterialVariant(material, statusId))
+      : statusMaterialVariant(child.material, statusId);
   });
 
   systemRegistry.set(systemId, nodes);
   console.log(`Loaded ${systemId}: ${nodes.length} structures`);
+}
+
+function statusMaterialVariant(baseMaterial, statusId) {
+  if (!baseMaterial) return baseMaterial;
+  let variants = statusMaterialVariants.get(baseMaterial);
+  if (!variants) {
+    variants = new Map();
+    statusMaterialVariants.set(baseMaterial, variants);
+  }
+
+  const key = statusId || 'no-concern';
+  if (!variants.has(key)) {
+    const material = baseMaterial.clone();
+    material.color?.set(medicalStatusColor(statusId));
+    variants.set(key, material);
+  }
+  return variants.get(key);
 }
 
 // Walks up from `node` (inclusive) to the closest node carrying a partId.

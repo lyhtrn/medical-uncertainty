@@ -1,7 +1,8 @@
 // Visibility Management - Hide, isolate, transparency, restore
 import * as THREE from 'three';
-import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, batchPartStates, notify, getMedicalStatus, setMedicalStatus, MEDICAL_STATUSES } from '../state/store.js';
+import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, batchPartStates, notify, getMedicalStatus, setMedicalStatus } from '../state/store.js';
 import { getMeshRegistry, getMeshesBySystem, ownMeshesOf, withDescendants } from './loadModel.js';
+import { applyMedicalColor } from './medicalColor.js';
 
 // --- Material ownership ------------------------------------------------------
 // Meshes share the 65 materials that came out of the GLB. A mesh only gets
@@ -48,14 +49,8 @@ function releaseMaterial(mesh, partId) {
 }
 
 function applyStatusColor(mesh, partId) {
-  const statusId = getMedicalStatus(partId);
-  const status = MEDICAL_STATUSES.find(entry => entry.id === statusId);
-  if (!status) return;
-
-  ownMaterials(mesh).forEach(material => {
-    if (material.color) material.color.set(status.color);
-    material.needsUpdate = true;
-  });
+  ownMaterials(mesh);
+  applyMedicalColor(materialsOf(mesh), getMedicalStatus(partId));
 }
 
 export function setPartMedicalStatus(partId, statusId) {

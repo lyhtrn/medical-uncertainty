@@ -57,6 +57,42 @@ describe('resolveAnatomicalMention', () => {
       label: 'Left knee'
     });
   });
+
+  it('does not assign a bilateral structure when laterality is absent', () => {
+    expect(resolveAnatomicalMention('Femur pain', parts)).toEqual({
+      type: 'structure',
+      label: 'Femur (side not specified)',
+      partIds: [],
+      ambiguous: true,
+      candidatePartIds: ['Femur.l', 'Femur.r']
+    });
+  });
+
+  it('proposes candidates without assigning a finding that mentions multiple structures', () => {
+    expect(resolveAnatomicalMention('Left patella pain and right femur pain', parts)).toEqual({
+      type: 'structure',
+      label: 'Multiple structures mentioned',
+      partIds: [],
+      ambiguous: true,
+      candidatePartIds: ['Patella.l', 'Femur.r']
+    });
+  });
+
+  it('does not guess when both sides of the same structure are documented', () => {
+    const finding = resolveAnatomicalMention('Pain in the left and right femur', parts);
+    expect(finding.ambiguous).toBe(true);
+    expect(finding.partIds).toEqual([]);
+    expect(finding.candidatePartIds).toEqual(['Femur.l', 'Femur.r']);
+  });
+
+  it('does not map laterality to an atlas part that belongs to the opposite side', () => {
+    const finding = resolveAnatomicalMention('Right femur pain', {
+      'Femur.l': { baseName: 'Femur', side: 'left' }
+    });
+    expect(finding.ambiguous).toBe(true);
+    expect(finding.partIds).toEqual([]);
+    expect(finding.candidatePartIds).toEqual([]);
+  });
 });
 
 describe('extractFindings', () => {
@@ -90,5 +126,9 @@ describe('extractFindings', () => {
         location: null
       }
     ]);
+  });
+
+  it('does not classify a negated symptom as a documented problem', () => {
+    expect(extractFindings('The patient denies left femur pain.', parts)).toEqual([]);
   });
 });

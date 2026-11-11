@@ -84,35 +84,111 @@ export function resolveAnatomicalMention(text, partsData = {}) {
     const aliases = [normalizedName, normalise(info.latinName)].filter(term => term.length >= 3);
     if (!aliases.some(term => normalizedText.includes(` ${term} `))) return;
 
-    const group = candidates.get(normalizedName) || { baseName, parts: [], length: normalizedName.length };
+    const group = candidates.get(normalizedName) || {
+      baseName,
+      parts: [],
+      aliases: new Set(),
+      length: normalizedName.length
+    };
+    aliases.forEach(alias => group.aliases.add(alias));
     group.parts.push({ partId, side: info.side || (partId.endsWith('.l') ? 'left' : partId.endsWith('.r') ? 'right' : null) });
     candidates.set(normalizedName, group);
   });
 
-  const structure = [...candidates.values()].sort((a, b) => b.length - a.length)[0];
-  if (structure) {
-    const side = /\bleft\b/i.test(text) ? 'left' : /\bright\b/i.test(text) ? 'right' : null;
-    const matchingParts = structure.parts.filter(part => !side || !part.side || part.side === side);
+  const structures = [...candidates.values()].sort((a, b) => b.length - a.length);
+  if (structures.length > 1) {
+    const candidatePartIds = structures.flatMap(structure => {
+      const { side, ambiguous } = sideNearMention(text, structure.aliases);
+      return structure.parts
+        .filter(part => ambiguous || !side || !part.side || part.side === side)
+        .map(part => part.partId);
+    });
     return {
       type: 'structure',
-      label: `${structure.baseName}${side ? ` (${side})` : structure.parts.length > 1 && matchingParts.length > 1 ? ' (side not specified)' : ''}`,
-      partIds: matchingParts.map(part => part.partId)
+      label: 'Multiple structures mentioned',
+      partIds: [],
+      ambiguous: true,
+      candidatePartIds: [...new Set(candidatePartIds)]
     };
   }
 
-  const region = BODY_REGIONS
+  const structure = structures[0];
+  if (structure) {
+    const { side, ambiguous: ambiguousSide } = sideNearMention(text, structure.aliases);
+    const matchingParts = structure.parts.filter(part => !side || !part.side || part.side === side);
+    const ambiguous = ambiguousSide || matchingParts.length !== 1;
+    return {
+      type: 'structure',
+      label: `${structure.baseName}${side ? ` (${side})` : ambiguous ? ' (side not specified)' : ''}`,
+      partIds: ambiguous ? [] : matchingParts.map(part => part.partId),
+      ...(ambiguous ? {
+        ambiguous: true,
+        candidatePartIds: matchingParts.map(part => part.partId)
+      } : {})
+    };
+  }
+
+  const regionTerms = BODY_REGIONS
     .flatMap(item => item.terms.map(term => ({ item, term: normalise(term) })))
-    .filter(({ term }) => term && normalizedText.includes(` ${term} `))
+    .filter(({ term }) => term && normalizedText.includes(` ${term} `));
+  const region = regionTerms
     .sort((a, b) => b.term.length - a.term.length)[0]?.item;
 
   if (!region) return null;
-  const side = /\bleft\b/i.test(text) ? 'left' : /\bright\b/i.test(text) ? 'right' : null;
+  const { side } = sideNearMention(text, regionTerms.filter(item => item.item === region).map(item => item.term));
   return {
     type: 'region',
     id: region.id,
     side,
     label: side ? `${side[0].toUpperCase()}${side.slice(1)} ${region.label.toLowerCase()}` : region.label
   };
+}
+
+function sideNearMention(text, terms) {
+  const normalizedText = normalise(text);
+  const paddedText = ` ${normalizedText} `;
+  const positions = new Map();
+  terms.forEach(term => {
+    let start = 0;
+    while (true) {
+      const position = paddedText.indexOf(` ${term} `, start);
+      if (position === -1) break;
+      positions.set(position, term.length);
+      start = position + term.length + 2;
+    }
+  });
+
+  const allowedBetweenSideAndStructure = new Set([
+    'anterior', 'distal', 'in', 'lateral', 'lower', 'medial', 'of', 'on',
+    'posterior', 'proximal', 'side', 'the', 'upper'
+  ]);
+  const sides = new Set();
+  let hasUnresolvedMention = false;
+
+  for (const [paddedPosition, termLength] of positions) {
+    const position = paddedPosition;
+    const precedingWords = normalizedText.slice(0, position).trim().split(/\s+/u).slice(-5);
+    if (/\b(?:left\s+(?:and\s+)?right|right\s+(?:and\s+)?left)\s*$/u.test(precedingWords.join(' '))) {
+      return { side: null, ambiguous: true };
+    }
+
+    const nearbySides = precedingWords.filter((word, index) => {
+      if (word !== 'left' && word !== 'right') return false;
+      return precedingWords.slice(index + 1).every(next => allowedBetweenSideAndStructure.has(next));
+    });
+    const sideAfter = normalizedText.slice(position + termLength).trim().split(/\s+/u).slice(0, 2);
+    const trailingSide = sideAfter[0] === 'on' && (sideAfter[1] === 'left' || sideAfter[1] === 'right')
+      ? sideAfter[1]
+      : null;
+    const mentionSides = new Set([...nearbySides, ...(trailingSide ? [trailingSide] : [])]);
+
+    if (mentionSides.size > 1) return { side: null, ambiguous: true };
+    if (mentionSides.size === 1) sides.add(mentionSides.values().next().value);
+    else hasUnresolvedMention = true;
+  }
+
+  if (sides.size > 1 || (sides.size && hasUnresolvedMention)) return { side: null, ambiguous: true };
+  return { side: sides.values().next().value || null, ambiguous: false };
 }
 
 export function extractFindings(text, partsData = {}, documentId = 'document') {
@@ -124,7 +200,7 @@ export function extractFindings(text, partsData = {}, documentId = 'document') {
 
   excerpts.forEach(excerpt => {
     FINDING_CATEGORIES.forEach(category => {
-      if (!CATEGORY_PATTERNS[category.id].test(excerpt)) return;
+      if (!CATEGORY_PATTERNS[category.id].test(excerpt) || isNegatedFinding(excerpt, category.id)) return;
 
       findings.push({
         id: `${documentId}:${findings.length}`,
@@ -139,4 +215,16 @@ export function extractFindings(text, partsData = {}, documentId = 'document') {
   });
 
   return findings;
+}
+
+function isNegatedFinding(excerpt, categoryId) {
+  const pattern = new RegExp(CATEGORY_PATTERNS[categoryId].source, 'gi');
+  for (const match of excerpt.matchAll(pattern)) {
+    const precedingText = excerpt.slice(0, match.index);
+    if (/(?:\bno\b|\bnot\b|\bdenies\b|\bwithout\b|\bnegative\s+for\b|\bruled\s+out\b)(?:\W+\w+){0,3}\s*$/i.test(precedingText)) {
+      continue;
+    }
+    return false;
+  }
+  return true;
 }

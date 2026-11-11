@@ -19,6 +19,10 @@ export function focusableWithin(container) {
   });
 }
 
+export function shouldSetInert(isDrawer, isOpen) {
+  return isDrawer && !isOpen;
+}
+
 // A closed drawer is still in the DOM; `inert` is what keeps Tab out of it.
 export function setInert(element, inert) {
   if (!element) return;

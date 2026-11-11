@@ -1,5 +1,16 @@
 const initializedRoots = new WeakSet();
 
+export function initInfoPanelTabsWhenReady(root = document) {
+  const initialize = () => initInfoPanelTabs(root);
+
+  if (root.readyState === 'loading') {
+    root.addEventListener('DOMContentLoaded', initialize, { once: true });
+    return;
+  }
+
+  initialize();
+}
+
 export function initInfoPanelTabs(root = document) {
   if (initializedRoots.has(root)) return true;
 
@@ -8,15 +19,7 @@ export function initInfoPanelTabs(root = document) {
   if (!tabs.length || !panels.length) return false;
 
   function activate(tab, focus = false) {
-    tabs.forEach(item => {
-      const active = item === tab;
-      item.setAttribute('aria-selected', String(active));
-      item.tabIndex = active ? 0 : -1;
-    });
-    panels.forEach(panel => {
-      panel.hidden = panel.dataset.infoPanel !== tab.dataset.infoTab;
-    });
-    if (focus) tab.focus();
+    activateTab(tabs, panels, tab, focus);
   }
 
   tabs.forEach((tab, index) => {
@@ -37,4 +40,25 @@ export function initInfoPanelTabs(root = document) {
   initializedRoots.add(root);
   activate(tabs.find(tab => tab.getAttribute('aria-selected') === 'true') || tabs[0]);
   return true;
+}
+
+export function activateInfoPanelTab(tabId, root = document) {
+  const tabs = [...root.querySelectorAll('[data-info-tab]')];
+  const panels = [...root.querySelectorAll('[data-info-panel]')];
+  const tab = tabs.find(item => item.dataset.infoTab === tabId);
+  if (!tab || !panels.some(panel => panel.dataset.infoPanel === tabId)) return false;
+  activateTab(tabs, panels, tab);
+  return true;
+}
+
+function activateTab(tabs, panels, tab, focus = false) {
+  tabs.forEach(item => {
+    const active = item === tab;
+    item.setAttribute('aria-selected', String(active));
+    item.tabIndex = active ? 0 : -1;
+  });
+  panels.forEach(panel => {
+    panel.hidden = panel.dataset.infoPanel !== tab.dataset.infoTab;
+  });
+  if (focus) tab.focus();
 }

@@ -110,6 +110,12 @@
             <p class="document-caution">Extraction suggestions are provisional and are not medical diagnoses. Review each excerpt and location before confirming.</p>
             <p class="document-privacy">Files are read in this browser. Document names, dates, excerpts, and review decisions are stored locally; nothing is sent to an external service.</p>
           </div>
+          <form class="document-text-form" id="documentTextForm">
+            <label for="documentText">Paste report text</label>
+            <textarea id="documentText" rows="5" placeholder="Paste report text here..." maxlength="2097152"></textarea>
+            <button type="submit" class="review-primary">Extract findings</button>
+          </form>
+          <div class="document-divider" aria-hidden="true">or upload a file</div>
           <label class="document-dropzone" id="documentDropzone" for="documentInput">
             <input id="documentInput" type="file" accept=".txt,.md,text/plain,text/markdown" multiple>
             <span class="dropzone-icon" aria-hidden="true">+</span>

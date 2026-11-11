@@ -1,11 +1,11 @@
 import { BODY_REGIONS, FINDING_CATEGORIES, extractFindings, isSupportedDocumentName, parseReportDate, resolveAnatomicalMention } from '../documents/extractor.js';
+import { confirmedMeshStatuses } from '../documents/meshStatuses.js';
 import { loadDocumentReview, saveDocumentReview } from '../state/documentReview.js';
 import { getMedicalStatus, MEDICAL_STATUSES, setMedicalStatus, state } from '../state/store.js';
 import { selectStructureAnywhere } from './sidebar.js';
 import { selectPartById } from '../viewer/selection.js';
 import { getMeshRegistry } from '../viewer/loadModel.js';
 import { setPartMedicalStatus } from '../viewer/visibility.js';
-import { initInfoPanelTabs } from './panelTabs.js';
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const SAMPLE_REPORT = `FICTIONAL SAMPLE REPORT - NOT A REAL PATIENT
@@ -17,19 +17,42 @@ An X-ray of the left knee was requested; results are pending.
 Management plan: rest, use a cold pack on the left knee, and arrange follow-up in two weeks.`;
 
 export function initDocumentReview(viewer, partsData) {
-  initInfoPanelTabs();
   const panel = document.getElementById('documentsPanel');
   const cards = document.getElementById('documentFindings');
   const list = document.getElementById('reviewDocuments');
   const statusMessage = document.getElementById('documentStatus');
   const input = document.getElementById('documentInput');
+  const textForm = document.getElementById('documentTextForm');
+  const textInput = document.getElementById('documentText');
   const dropzone = document.getElementById('documentDropzone');
   const regionOverlay = document.getElementById('regionEvidenceOverlay');
-  if (!panel || !cards || !input || !dropzone) return;
+  if (!panel || !cards || !list || !input || !dropzone) return;
 
   let review = loadDocumentReview();
   const samplePreview = document.getElementById('sampleReportPreview');
   if (samplePreview) samplePreview.textContent = SAMPLE_REPORT;
+
+  for (const [partId, statusId] of confirmedMeshStatuses(review.findings)) {
+    if (getMeshRegistry().has(partId)) setPartMedicalStatus(partId, statusId);
+    else setMedicalStatus(partId, statusId);
+  }
+
+  textForm?.addEventListener('submit', event => {
+    event.preventDefault();
+    const text = textInput?.value.trim();
+    if (!text) {
+      setMessage('Enter report text before extracting findings.');
+      return;
+    }
+    if (new TextEncoder().encode(text).byteLength > MAX_FILE_BYTES) {
+      setMessage('Report text must be 2 MB or smaller.');
+      return;
+    }
+
+    const date = parseReportDate(text);
+    addReport({ name: `Pasted report${date ? ` (${date})` : ''}.txt`, text, sample: false });
+    textForm.reset();
+  });
 
   input.addEventListener('change', async () => {
     for (const file of input.files || []) await readFile(file);
@@ -90,7 +113,7 @@ export function initDocumentReview(viewer, partsData) {
     let location = null;
     if (kind === 'structure') {
       location = resolveAnatomicalMention(form.querySelector('[data-edit-location]').value, partsData);
-      if (location?.type !== 'structure') {
+      if (location?.type !== 'structure' || location.ambiguous || location.partIds.length !== 1) {
         setMessage('Enter a structure name or stable mesh ID found in the anatomy atlas.');
         return;
       }
@@ -109,7 +132,7 @@ export function initDocumentReview(viewer, partsData) {
     const previousPartIds = partIdsOf(finding.location);
     if (finding.decision === 'confirmed') captureBaselines(location);
     finding.category = form.querySelector('[data-edit-category]').value;
-    finding.statusId = form.querySelector('[data-edit-status]').value;
+    finding.statusId = FINDING_CATEGORIES.find(category => category.id === finding.category).statusId;
     finding.location = location;
     persist();
 
@@ -131,11 +154,14 @@ export function initDocumentReview(viewer, partsData) {
       return;
     }
 
+    let text;
     try {
-      addReport({ name: file.name, text: await file.text(), sample: false });
+      text = await file.text();
     } catch {
       setMessage(`Could not read ${file.name} in this browser.`);
+      return;
     }
+    addReport({ name: file.name, text, sample: false });
   }
 
   function addReport({ name, text, sample }) {
@@ -155,14 +181,20 @@ export function initDocumentReview(viewer, partsData) {
       addedAt: new Date().toISOString()
     });
     review.findings.unshift(...findings);
-    persist();
-    setMessage(findings.length
-      ? `${findings.length} provisional suggestion${findings.length === 1 ? '' : 's'} ready for review.`
-      : 'Document saved locally. No supported symptom, investigation, or management phrases were detected.');
+    const saved = persist();
+    setMessage(!saved
+      ? 'Could not save this review in browser storage.'
+      : findings.length
+        ? `${findings.length} provisional suggestion${findings.length === 1 ? '' : 's'} ready for review.`
+        : 'Document saved locally. No supported symptom, investigation, or management phrases were detected.');
     render();
   }
 
   async function confirmFinding(finding) {
+    if (finding.location?.ambiguous) {
+      setMessage('Choose one exact atlas mesh in Edit before confirming this finding.');
+      return;
+    }
     if (finding.location?.type === 'structure') captureBaselines(finding.location);
     finding.decision = 'confirmed';
     finding.confirmedAt = new Date().toISOString();
@@ -195,20 +227,17 @@ export function initDocumentReview(viewer, partsData) {
   }
 
   async function syncPartStatuses(partIds) {
+    const confirmedStatuses = confirmedMeshStatuses(review.findings);
     for (const partId of new Set(partIds)) {
-      const confirmed = review.findings
-        .filter(finding => finding.decision === 'confirmed'
-          && finding.location?.type === 'structure'
-          && finding.location.partIds?.includes(partId))
-        .sort((a, b) => String(b.confirmedAt).localeCompare(String(a.confirmedAt)))[0];
-      const statusId = confirmed?.statusId ?? review.statusBaselines[partId] ?? null;
+      const hasConfirmed = confirmedStatuses.has(partId);
+      const statusId = hasConfirmed ? confirmedStatuses.get(partId) : review.statusBaselines[partId] ?? null;
 
-      if (!confirmed && !Object.hasOwn(review.statusBaselines, partId)) continue;
+      if (!hasConfirmed && !Object.hasOwn(review.statusBaselines, partId)) continue;
 
       if (getMeshRegistry().has(partId)) setPartMedicalStatus(partId, statusId);
       else setMedicalStatus(partId, statusId);
 
-      if (!confirmed) delete review.statusBaselines[partId];
+      if (!hasConfirmed) delete review.statusBaselines[partId];
       if (state.selectedPart?.id === partId && getMeshRegistry().has(partId)) {
         selectPartById(partId, viewer);
       }
@@ -228,7 +257,9 @@ export function initDocumentReview(viewer, partsData) {
   }
 
   function persist() {
-    saveDocumentReview(review);
+    const saved = saveDocumentReview(review);
+    if (!saved) setMessage('Could not save this review in browser storage.');
+    return saved;
   }
 
   function render() {
@@ -252,7 +283,11 @@ export function initDocumentReview(viewer, partsData) {
   function renderFinding(finding, sourceDocument) {
     const category = FINDING_CATEGORIES.find(item => item.id === finding.category);
     const status = MEDICAL_STATUSES.find(item => item.id === finding.statusId);
-    const locationText = finding.location?.type === 'region'
+    const locationText = finding.location?.ambiguous
+      ? finding.location.candidatePartIds?.length
+        ? `Possible meshes: ${finding.location.candidatePartIds.join(', ')} · uncertain match; choose one in Edit`
+        : 'No exact atlas mesh match; edit the location before colouring a mesh'
+      : finding.location?.type === 'region'
       ? `Region-level: ${finding.location.label} · no individual mesh assigned`
       : finding.location?.type === 'structure'
         ? finding.location.label
@@ -274,16 +309,13 @@ export function initDocumentReview(viewer, partsData) {
         <div class="review-target">${escapeHtml(locationText)}</div>
         <div class="review-status"><i style="--status-color: ${status?.color || '#A9B4B8'}"></i>Suggested: ${escapeHtml(status?.label || 'No recorded concern')}</div>
         <div class="review-actions">
-          ${finding.decision === 'pending' ? '<button type="button" class="review-primary" data-review-action="confirm">Confirm</button>' : ''}
+          ${finding.decision === 'pending' ? `<button type="button" class="review-primary" data-review-action="confirm" ${finding.location?.ambiguous ? 'disabled' : ''}>Confirm</button>` : ''}
           <button type="button" data-review-action="edit">Edit</button>
           ${finding.decision !== 'rejected' ? '<button type="button" class="review-reject" data-review-action="reject">Reject</button>' : ''}
         </div>
         <form class="review-edit-form" data-edit-form hidden>
           <label>Finding type
             <select data-edit-category>${FINDING_CATEGORIES.map(item => `<option value="${item.id}" ${item.id === finding.category ? 'selected' : ''}>${item.label}</option>`).join('')}</select>
-          </label>
-          <label>Medical status
-            <select data-edit-status>${MEDICAL_STATUSES.map(item => `<option value="${item.id}" ${item.id === finding.statusId ? 'selected' : ''}>${item.label}</option>`).join('')}</select>
           </label>
           <label>Location type
             <select data-target-kind>

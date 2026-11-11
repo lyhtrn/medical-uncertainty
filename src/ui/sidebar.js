@@ -7,7 +7,7 @@ import { selectPartById, deselectPart } from '../viewer/selection.js';
 import { setView, resetView, focusOnRegion } from '../viewer/camera.js';
 import { loadAllData, searchStructures } from '../utils/dataLoader.js';
 import { initDepthSlider, resetDepthSlider } from './depthSlider.js';
-import { setInert, focusFirst, trapFocus } from './focus.js';
+import { setInert, focusFirst, trapFocus, shouldSetInert } from './focus.js';
 
 const SIDEBAR_COPY = {
   en: {
@@ -685,7 +685,7 @@ function initDrawers() {
 
     // A panel that is off screen must not be reachable with Tab. The systems
     // panel is a real column on desktop, so it only goes inert as a drawer.
-    const offScreen = name === 'systems' ? drawerQuery.matches && !open : !open;
+    const offScreen = shouldSetInert(drawerQuery.matches, open);
     setInert(panel.el, offScreen);
 
     const trigger = document.getElementById(panel.trigger);
