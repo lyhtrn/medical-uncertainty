@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
-import { state, setLoadingSystem } from '../state/store.js';
+import { state, setLoadingSystem, getMedicalStatus, MEDICAL_STATUSES } from '../state/store.js';
 import { asset } from '../utils/paths.js';
 
 // Without an acceleration structure, picking cost grows with the triangle
@@ -204,6 +204,17 @@ function processModel(model, systemId, viewer) {
     const ownerId = findAncestorPartId(child);
     const owner = ownerId && structures.get(ownerId);
     if (owner) owner.ownMeshes.push(child);
+
+    const status = MEDICAL_STATUSES.find(entry => entry.id === getMedicalStatus(ownerId));
+    if (status) {
+      child.material = Array.isArray(child.material)
+        ? child.material.map(material => material.clone())
+        : child.material.clone();
+      child.userData.ownsMaterial = true;
+      (Array.isArray(child.material) ? child.material : [child.material]).forEach(material => {
+        if (material.color) material.color.set(status.color);
+      });
+    }
   });
 
   systemRegistry.set(systemId, nodes);

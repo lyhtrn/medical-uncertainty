@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Interactive 3D anatomy atlas built on Z-Anatomy">
-  <title>Z-Anatomy - 3D Anatomy Atlas</title>
+  <meta name="description" content="Explore anatomy and record structure-specific medical statuses in a personal 3D atlas.">
+  <title>Medical Uncertainty | 3D Anatomy Atlas</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 </head>
 <body>
@@ -15,7 +15,7 @@
         <button id="systemsOpen" class="btn-icon drawer-open" aria-label="Open systems" title="Systems">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
         </button>
-        <h1 class="logo">Z-Anatomy</h1>
+        <h1 class="logo">Medical Uncertainty</h1>
       </div>
       <div class="header-center">
         <div class="search-container">
@@ -43,7 +43,7 @@
       <!-- Sidebar - Systems -->
       <aside class="sidebar sidebar-systems" id="systemsSidebar">
         <div class="sidebar-header">
-          <h2>Anatomical systems</h2>
+          <h2>Anatomical layers</h2>
           <button class="sidebar-toggle" id="systemsToggle" aria-label="Close systems">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
@@ -76,7 +76,7 @@
       <!-- Sidebar - Info Panel -->
       <aside class="sidebar sidebar-info" id="infoSidebar">
         <div class="sidebar-header">
-          <h2>Information</h2>
+          <h2>Structure details</h2>
           <button class="sidebar-toggle" id="infoToggle" aria-label="Close information">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
@@ -87,7 +87,13 @@
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
             </svg>
             <p>Select an anatomical structure</p>
-            <span class="hint">Click the 3D model to see its details</span>
+            <span class="hint">Choose a structure in the 3D atlas to view its information and status.</span>
+            <div class="status-legend" aria-label="Medical status legend">
+              <span><i style="--status-color: #A9B4B8"></i>No recorded concern</span>
+              <span><i style="--status-color: #E95858"></i>Documented problem</span>
+              <span><i style="--status-color: #F5A34C"></i>Management in progress</span>
+              <span><i style="--status-color: #45B9B4"></i>Currently investigating</span>
+            </div>
           </div>
           <div id="structureInfo" class="structure-info hidden"></div>
         </div>

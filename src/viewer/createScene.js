@@ -7,7 +7,7 @@ console.log('[createScene] Module loaded');
 export function createScene() {
   // Scene
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0d1117);
+  scene.background = new THREE.Color(0xf3f7f6);
 
   // Renderer
   const canvas = document.getElementById('threeCanvas');

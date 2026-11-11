@@ -54,6 +54,7 @@ export function initSystemsSidebar() {
   const lang = state.language || 'en';
 
   const presets = `
+    <div class="sidebar-section-label">Body regions</div>
     <div class="preset-row">
       ${PRESETS.map(preset => `
         <button type="button" class="preset-chip" data-preset="${preset.id}">

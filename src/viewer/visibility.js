@@ -1,6 +1,6 @@
 // Visibility Management - Hide, isolate, transparency, restore
 import * as THREE from 'three';
-import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, batchPartStates, notify } from '../state/store.js';
+import { state, setHiddenParts, setTransparentParts, setIsolatedPart, getPartState, setPartState, batchPartStates, notify, getMedicalStatus, setMedicalStatus, MEDICAL_STATUSES } from '../state/store.js';
 import { getMeshRegistry, getMeshesBySystem, ownMeshesOf, withDescendants } from './loadModel.js';
 
 // --- Material ownership ------------------------------------------------------
@@ -44,6 +44,41 @@ function releaseMaterial(mesh, partId) {
 
   const resting = restingMaterial(mesh, partId);
   if (resting) mesh.material = resting;
+  applyStatusColor(mesh, partId);
+}
+
+function applyStatusColor(mesh, partId) {
+  const statusId = getMedicalStatus(partId);
+  const status = MEDICAL_STATUSES.find(entry => entry.id === statusId);
+  if (!status) return;
+
+  ownMaterials(mesh).forEach(material => {
+    if (material.color) material.color.set(status.color);
+    material.needsUpdate = true;
+  });
+}
+
+export function setPartMedicalStatus(partId, statusId) {
+  if (!getMeshRegistry().has(partId) || !setMedicalStatus(partId, statusId)) return false;
+
+  ownMeshesOf(partId).forEach(mesh => {
+    if (statusId) {
+      applyStatusColor(mesh, partId);
+      return;
+    }
+
+    releaseMaterial(mesh, partId);
+    const opacity = getPartState(partId)?.opacity ?? 1;
+    if (opacity < 1) ownMaterials(mesh).forEach(material => {
+      material.transparent = true;
+      material.opacity = opacity;
+      material.depthWrite = false;
+      material.needsUpdate = true;
+    });
+  });
+
+  notify('medicalStatusChanged', { partId, statusId });
+  return true;
 }
 
 // Ghosting touches nearly every mesh at once, so it uses one shared faded

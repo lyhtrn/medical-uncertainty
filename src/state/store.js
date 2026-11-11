@@ -4,6 +4,9 @@ export const state = {
   // Selected structure
   selectedPart: null,
 
+  // Patient-entered structure statuses, persisted independently of shared links.
+  medicalStatuses: readMedicalStatuses(),
+
   // Loaded systems
   loadedSystems: [],
 
@@ -49,6 +52,48 @@ export const state = {
   selectionHistory: [],
   maxHistory: 20
 };
+
+export const MEDICAL_STATUSES = [
+  { id: 'no-concern', label: 'No recorded concern', color: '#A9B4B8' },
+  { id: 'documented-problem', label: 'Documented problem', color: '#E95858' },
+  { id: 'management-progress', label: 'Management in progress', color: '#F5A34C' },
+  { id: 'investigating', label: 'Currently investigating', color: '#45B9B4' }
+];
+
+const validMedicalStatusIds = new Set(MEDICAL_STATUSES.map(status => status.id));
+const MEDICAL_STATUS_STORAGE_KEY = 'medical-uncertainty:statuses';
+
+function readMedicalStatuses() {
+  try {
+    const stored = globalThis.localStorage?.getItem(MEDICAL_STATUS_STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : {};
+    return new Map(Object.entries(parsed).filter(([, statusId]) =>
+      MEDICAL_STATUSES.some(status => status.id === statusId)
+    ));
+  } catch {
+    return new Map();
+  }
+}
+
+export function getMedicalStatus(partId) {
+  return state.medicalStatuses.get(partId) || null;
+}
+
+export function setMedicalStatus(partId, statusId) {
+  if (!partId || (statusId !== null && !validMedicalStatusIds.has(statusId))) return false;
+
+  if (statusId === null) state.medicalStatuses.delete(partId);
+  else state.medicalStatuses.set(partId, statusId);
+
+  try {
+    globalThis.localStorage?.setItem(MEDICAL_STATUS_STORAGE_KEY, JSON.stringify(Object.fromEntries(state.medicalStatuses)));
+  } catch {
+    // Keep the in-memory assignment if browser storage is unavailable.
+  }
+
+  notify('medicalStatuses', state.medicalStatuses);
+  return true;
+}
 
 // Subscribers for reactive updates
 const subscribers = new Map(); // Map<key, Set<callback>>
