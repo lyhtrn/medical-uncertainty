@@ -5,6 +5,7 @@ import { loadSystems } from './viewer/loadModel.js';
 import { initSelection } from './viewer/selection.js';
 import { initUI } from './ui/sidebar.js';
 import { initDocumentReview } from './ui/documents.js';
+import { initInfoPanelTabs } from './ui/panelTabs.js';
 import { state, setViewer, setPartsData, setSystemsData, setTranslations, setSearchIndex, subscribe } from './state/store.js';
 import { readState, storedState, applyState, scheduleStateWrite } from './state/urlState.js';
 import { loadModel } from './viewer/loadModel.js';
@@ -14,6 +15,7 @@ import { loadSystemsData, loadLexicon, loadDefinitions, buildPartsData, DEFAULT_
 import { translationsIt, translationsEn } from './data/translations.js';
 
 setTranslations({ it: translationsIt, en: translationsEn });
+initInfoPanelTabs();
 
 function buildSearchIndex(parts) {
   const index = [];

@@ -5,6 +5,7 @@ import { selectStructureAnywhere } from './sidebar.js';
 import { selectPartById } from '../viewer/selection.js';
 import { getMeshRegistry } from '../viewer/loadModel.js';
 import { setPartMedicalStatus } from '../viewer/visibility.js';
+import { initInfoPanelTabs } from './panelTabs.js';
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const SAMPLE_REPORT = `FICTIONAL SAMPLE REPORT - NOT A REAL PATIENT
@@ -16,6 +17,7 @@ An X-ray of the left knee was requested; results are pending.
 Management plan: rest, use a cold pack on the left knee, and arrange follow-up in two weeks.`;
 
 export function initDocumentReview(viewer, partsData) {
+  initInfoPanelTabs();
   const panel = document.getElementById('documentsPanel');
   const cards = document.getElementById('documentFindings');
   const list = document.getElementById('reviewDocuments');
@@ -26,11 +28,8 @@ export function initDocumentReview(viewer, partsData) {
   if (!panel || !cards || !input || !dropzone) return;
 
   let review = loadDocumentReview();
-  document.getElementById('sampleReportPreview').textContent = SAMPLE_REPORT;
-
-  document.querySelectorAll('[data-info-tab]').forEach(tab => {
-    tab.addEventListener('click', () => setActiveTab(tab.dataset.infoTab));
-  });
+  const samplePreview = document.getElementById('sampleReportPreview');
+  if (samplePreview) samplePreview.textContent = SAMPLE_REPORT;
 
   input.addEventListener('change', async () => {
     for (const file of input.files || []) await readFile(file);
@@ -121,16 +120,6 @@ export function initDocumentReview(viewer, partsData) {
     }
     render();
   });
-
-  function setActiveTab(tabId) {
-    document.querySelectorAll('[data-info-tab]').forEach(tab => {
-      const active = tab.dataset.infoTab === tabId;
-      tab.setAttribute('aria-selected', String(active));
-    });
-    document.querySelectorAll('[data-info-panel]').forEach(content => {
-      content.hidden = content.dataset.infoPanel !== tabId;
-    });
-  }
 
   async function readFile(file) {
     if (!isSupportedDocumentName(file.name)) {
