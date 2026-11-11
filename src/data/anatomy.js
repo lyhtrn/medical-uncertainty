@@ -25,6 +25,25 @@ export const SYSTEM_IDS = [
   'visceral'
 ];
 
+export const ANATOMY_LAYERS = [
+  { id: 'skin', label: { en: 'Skin', it: 'Pelle' }, systems: [] },
+  { id: 'muscles', label: { en: 'Muscles', it: 'Muscoli' }, systems: ['muscular'] },
+  { id: 'skeleton', label: { en: 'Skeleton', it: 'Scheletro' }, systems: ['skeletal'] },
+  { id: 'organs', label: { en: 'Organs', it: 'Organi' }, systems: ['visceral', 'lymphatic'] },
+  { id: 'nerves', label: { en: 'Nerves', it: 'Nervi' }, systems: ['nervous'] },
+  { id: 'blood-vessels', label: { en: 'Blood vessels', it: 'Vasi sanguigni' }, systems: ['cardiovascular'] },
+  { id: 'joints-soft-tissue', label: { en: 'Joints & soft tissue', it: 'Articolazioni e tessuti molli' }, systems: ['joints'] }
+];
+
+export const BODY_REGIONS = [
+  { id: 'full', label: { en: 'Full body', it: 'Corpo intero' } },
+  { id: 'head-neck', label: { en: 'Head & neck', it: 'Testa e collo' } },
+  { id: 'chest-abdomen', label: { en: 'Chest & abdomen', it: 'Torace e addome' } },
+  { id: 'arms-hands', label: { en: 'Arms & hands', it: 'Braccia e mani' } },
+  { id: 'hips-pelvis', label: { en: 'Hips & pelvis', it: 'Anche e bacino' } },
+  { id: 'legs-feet', label: { en: 'Legs & feet', it: 'Gambe e piedi' } }
+];
+
 // System loaded on startup. The others are fetched when the user enables them,
 // so the initial payload stays around 2 MB instead of ~47 MB.
 export const DEFAULT_SYSTEM = 'skeletal';

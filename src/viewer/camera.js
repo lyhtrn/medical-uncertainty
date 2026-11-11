@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { state, setAnimating, setCurrentView, notify } from '../state/store.js';
 import { restoreAllParts } from './visibility.js';
+import { getAllMeshes } from './loadModel.js';
+import { getRegionBounds } from './regionBounds.js';
 
 const VIEWS = {
   front: { position: new THREE.Vector3(0, 0, 1), target: new THREE.Vector3(0, 0, 0) },
@@ -58,6 +60,31 @@ function getModelBounds(scene) {
   const maxDim = Math.max(size.x, size.y, size.z);
 
   return { box, size, center, maxDim };
+}
+
+export function focusOnRegion(regionId, viewer, animate = true) {
+  if (regionId === 'full') return setView('full', viewer, animate);
+
+  const bounds = getRegionBounds(getAllMeshes(), regionId);
+  if (!bounds || bounds.isEmpty()) return setView('full', viewer, animate);
+
+  const { camera, controls } = viewer;
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov);
+  const distance = Math.max(size.y, size.x / camera.aspect) / (2 * Math.tan(verticalFov / 2)) * 1.35
+    + size.z * 0.5;
+  const direction = new THREE.Vector3().subVectors(camera.position, controls.target);
+  if (direction.lengthSq() === 0) direction.set(0, 0, 1);
+  direction.normalize();
+  const targetPosition = center.clone().add(direction.multiplyScalar(Math.max(distance, 0.1)));
+
+  if (animate) return animateCamera(camera, controls, targetPosition, center);
+
+  camera.position.copy(targetPosition);
+  controls.target.copy(center);
+  controls.update();
+  return Promise.resolve();
 }
 
 function animateCamera(camera, controls, targetPosition, targetTarget) {

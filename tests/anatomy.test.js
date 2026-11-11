@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitSide, formatPartName, buildPartsData, SYSTEM_IDS } from '../src/data/anatomy.js';
+import { splitSide, formatPartName, buildPartsData, SYSTEM_IDS, ANATOMY_LAYERS, BODY_REGIONS } from '../src/data/anatomy.js';
 
 describe('splitSide', () => {
   it('separates the Z-Anatomy side suffix', () => {
@@ -69,6 +69,25 @@ describe('SYSTEM_IDS', () => {
   it('matches the seven models that are exported', () => {
     expect(SYSTEM_IDS).toEqual([
       'skeletal', 'muscular', 'joints', 'cardiovascular', 'lymphatic', 'nervous', 'visceral'
+    ]);
+  });
+});
+
+describe('patient-friendly anatomy controls', () => {
+  it('maps available layers to the exported atlas systems and marks skin unavailable', () => {
+    expect(ANATOMY_LAYERS.map(layer => layer.id)).toEqual([
+      'skin', 'muscles', 'skeleton', 'organs', 'nerves', 'blood-vessels', 'joints-soft-tissue'
+    ]);
+    expect(ANATOMY_LAYERS.find(layer => layer.id === 'skin').systems).toEqual([]);
+    expect(ANATOMY_LAYERS.find(layer => layer.id === 'organs').systems).toEqual(['visceral', 'lymphatic']);
+    ANATOMY_LAYERS.flatMap(layer => layer.systems).forEach(systemId => {
+      expect(SYSTEM_IDS).toContain(systemId);
+    });
+  });
+
+  it('offers the six supported body regions', () => {
+    expect(BODY_REGIONS.map(region => region.label.en)).toEqual([
+      'Full body', 'Head & neck', 'Chest & abdomen', 'Arms & hands', 'Hips & pelvis', 'Legs & feet'
     ]);
   });
 });

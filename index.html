@@ -12,21 +12,12 @@
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <button id="systemsOpen" class="btn-icon drawer-open" aria-label="Open systems" title="Systems">
+        <button id="systemsOpen" class="btn-icon drawer-open" aria-label="Open anatomy" title="Explore anatomy" aria-controls="systemsSidebar" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
         </button>
         <h1 class="logo">Medical Uncertainty</h1>
       </div>
-      <div class="header-center">
-        <div class="search-container">
-          <input type="text" id="searchInput" class="search-input" placeholder="Search an anatomical structure..." autocomplete="off">
-          <div id="searchResults" class="search-results"></div>
-        </div>
-      </div>
       <div class="header-right">
-        <button id="searchOpen" class="btn-icon drawer-open" aria-label="Search" title="Search" aria-expanded="false">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        </button>
         <select id="langSelect" class="lang-select" aria-label="Language">
           <option value="en">EN</option>
           <option value="it">IT</option>
@@ -43,12 +34,24 @@
       <!-- Sidebar - Systems -->
       <aside class="sidebar sidebar-systems" id="systemsSidebar">
         <div class="sidebar-header">
-          <h2>Anatomical layers</h2>
-          <button class="sidebar-toggle" id="systemsToggle" aria-label="Close systems">
+          <h2>Explore Anatomy</h2>
+          <button class="sidebar-toggle sidebar-collapse-toggle" id="sidebarCollapse" type="button" aria-label="Collapse anatomy sidebar" aria-controls="systemsSidebar" aria-expanded="true" title="Collapse anatomy sidebar">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button class="sidebar-toggle sidebar-drawer-toggle" id="systemsToggle" aria-label="Close anatomy">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
-        <div class="sidebar-content" id="systemsList"></div>
+        <div class="sidebar-content anatomy-sidebar-content" id="systemsContent">
+          <div class="sidebar-search">
+            <label id="sidebarSearchLabel" for="searchInput">Search structures</label>
+            <div class="search-container">
+              <input type="search" id="searchInput" class="search-input" placeholder="Search anatomical structures..." autocomplete="off" aria-label="Search anatomical structures">
+              <div id="searchResults" class="search-results"></div>
+            </div>
+          </div>
+          <div id="systemsList"></div>
+        </div>
       </aside>
 
       <!-- 3D Viewer -->

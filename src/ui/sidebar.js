@@ -1,138 +1,149 @@
 // Sidebar UI - Systems panel with collapsible groups
 import { state, subscribe, getSystemParts, getStructureInfo, setLanguage, translate } from '../state/store.js';
 import { getMeshRegistry, loadModel, unloadSystem } from '../viewer/loadModel.js';
-import { SYSTEM_IDS } from '../data/anatomy.js';
-import { hideSystem, showSystem, hidePart, showPart, isolatePart, setPartTransparency, restoreAllParts, getSystemVisibilityState } from '../viewer/visibility.js';
+import { ANATOMY_LAYERS, BODY_REGIONS } from '../data/anatomy.js';
+import { hideSystem, showSystem, hidePart, isolatePart, setPartTransparency, restoreAllParts, getSystemVisibilityState } from '../viewer/visibility.js';
 import { selectPartById, deselectPart } from '../viewer/selection.js';
-import { setView, resetView } from '../viewer/camera.js';
+import { setView, resetView, focusOnRegion } from '../viewer/camera.js';
 import { loadAllData, searchStructures } from '../utils/dataLoader.js';
 import { initDepthSlider, resetDepthSlider } from './depthSlider.js';
-import { PRESETS, applyPreset } from '../data/presets.js';
-import { setInert, focusFirst, trapFocus, rovingList } from './focus.js';
+import { setInert, focusFirst, trapFocus } from './focus.js';
 
-// Systems as they are organised in the Z-Anatomy source file. Respiratory,
-// digestive and urinary structures all live in the single "visceral" model.
-const SYSTEM_LABELS = {
-  it: {
-    skeletal: 'Sistema scheletrico',
-    muscular: 'Sistema muscolare',
-    joints: 'Articolazioni',
-    cardiovascular: 'Sistema cardiovascolare',
-    lymphatic: 'Organi linfatici',
-    nervous: 'Sistema nervoso e organi di senso',
-    visceral: 'Sistemi viscerali'
-  },
+const SIDEBAR_COPY = {
   en: {
-    skeletal: 'Skeletal system',
-    muscular: 'Muscular system',
-    joints: 'Joints',
-    cardiovascular: 'Cardiovascular system',
-    lymphatic: 'Lymphoid organs',
-    nervous: 'Nervous system & sense organs',
-    visceral: 'Visceral systems'
+    heading: 'Explore Anatomy',
+    searchLabel: 'Search structures',
+    searchPlaceholder: 'Search anatomical structures...',
+    regionLabel: 'Body region',
+    reset: 'Reset View',
+    unavailable: 'Not available in this atlas',
+    loadError: 'Could not load this layer. Please try again.',
+    collapse: 'Collapse anatomy sidebar',
+    expand: 'Expand anatomy sidebar'
+  },
+  it: {
+    heading: 'Esplora l’anatomia',
+    searchLabel: 'Cerca strutture',
+    searchPlaceholder: 'Cerca strutture anatomiche...',
+    regionLabel: 'Regione del corpo',
+    reset: 'Reimposta vista',
+    unavailable: 'Non disponibile in questo atlante',
+    loadError: 'Impossibile caricare questo livello. Riprova.',
+    collapse: 'Comprimi il pannello anatomico',
+    expand: 'Espandi il pannello anatomico'
   }
 };
 
-const SYSTEM_ICONS = {
-  skeletal: '🦴',
-  muscular: '💪',
-  joints: '🦵',
-  cardiovascular: '❤️',
-  lymphatic: '🫧',
-  nervous: '🧠',
-  visceral: '🫁'
-};
-
-export function systemLabel(systemId, lang = state.language || 'it') {
-  return SYSTEM_LABELS[lang]?.[systemId] || SYSTEM_LABELS.it[systemId] || systemId;
-}
+let selectedRegion = 'full';
 
 export function initSystemsSidebar() {
   const container = document.getElementById('systemsList');
   if (!container) return;
 
   const lang = state.language || 'en';
+  const copy = SIDEBAR_COPY[lang] || SIDEBAR_COPY.en;
 
-  const presets = `
-    <div class="sidebar-section-label">Body regions</div>
-    <div class="preset-row">
-      ${PRESETS.map(preset => `
-        <button type="button" class="preset-chip" data-preset="${preset.id}">
-          ${escapeHtml(preset.label[lang] || preset.label.en)}
-        </button>
-      `).join('')}
+  container.innerHTML = `
+    <fieldset class="anatomy-layers" aria-label="${escapeHtml(lang === 'it' ? 'Livelli anatomici' : 'Anatomical layers')}">
+      ${ANATOMY_LAYERS.map(layer => {
+        const available = availableSystemsForLayer(layer).length > 0;
+        const label = layer.label[lang] || layer.label.en;
+        return `
+          <div class="anatomy-layer-option" data-layer-option="${layer.id}">
+            <label class="anatomy-layer" data-layer-label="${layer.id}">
+              <input type="checkbox" data-layer-toggle="${layer.id}" aria-label="${escapeHtml(label)}" ${available ? '' : 'disabled'}>
+              <span class="anatomy-layer-name">${escapeHtml(label)}</span>
+              ${available ? '' : `<span class="layer-unavailable">${escapeHtml(copy.unavailable)}</span>`}
+            </label>
+            <span class="layer-error" data-layer-error="${layer.id}" role="alert" hidden>${escapeHtml(copy.loadError)}</span>
+          </div>
+        `;
+      }).join('')}
+    </fieldset>
+    <div class="anatomy-region">
+      <label for="bodyRegionSelect">${escapeHtml(copy.regionLabel)}</label>
+      <select id="bodyRegionSelect">
+        ${BODY_REGIONS.map(region => `<option value="${region.id}" ${selectedRegion === region.id ? 'selected' : ''}>${escapeHtml(region.label[lang] || region.label.en)}</option>`).join('')}
+      </select>
     </div>
+    <button type="button" class="anatomy-reset" id="sidebarResetBtn">${escapeHtml(copy.reset)}</button>
   `;
 
-  container.innerHTML = presets + SYSTEM_IDS.map(systemId => {
-    const parts = getSystemParts(systemId);
-    const count = parts.length;
-    const icon = SYSTEM_ICONS[systemId] || '🔬';
-    const label = systemLabel(systemId, lang);
+  syncLayerControls();
 
-    // Determine initial visibility state
-    const visibility = getSystemVisibilityState(systemId);
-    const isVisible = visibility.visible;
-    const checkboxState = isVisible ? 'checked' : '';
-
-    return `
-      <div class="system-group" data-system="${systemId}">
-        <label class="system-group-label">
-          <input type="checkbox" ${checkboxState} data-system-checkbox="${systemId}">
-          <span class="system-icon">${icon}</span>
-          <span class="system-name">${label}</span>
-          <span class="system-count">${count}</span>
-        </label>
-        <div class="system-group-content" style="display: ${isVisible ? 'block' : 'none'};"></div>
-      </div>
-    `;
-  }).join('');
-
-  container.querySelectorAll('[data-preset]').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const preset = PRESETS.find(p => p.id === chip.dataset.preset);
-      if (preset) applyPreset(preset);
-    });
-  });
-
-  // Systems loaded before this ran — the startup system, or anything restored
-  // from a link — never passed through the checkbox handler, so their lists
-  // would stay empty.
-  state.loadedSystems.forEach(systemId => {
-    const content = container.querySelector(`.system-group[data-system="${systemId}"] .system-group-content`);
-    if (content && content.children.length === 0) populateSystemStructures(systemId, content);
-  });
-
-  // Add event listeners for system toggles
-  container.querySelectorAll('[data-system-checkbox]').forEach(checkbox => {
-    checkbox.addEventListener('change', async (e) => {
-      const systemId = e.target.dataset.systemCheckbox;
-      const group = e.target.closest('.system-group');
-      const content = group.querySelector('.system-group-content');
-
-      // A manual toggle invalidates the depth slider's picture of the scene.
+  container.querySelectorAll('[data-layer-toggle]').forEach(input => {
+    input.addEventListener('change', async () => {
+      const layer = ANATOMY_LAYERS.find(entry => entry.id === input.dataset.layerToggle);
+      const systems = availableSystemsForLayer(layer);
+      const label = input.closest('.anatomy-layer');
+      const error = container.querySelector(`[data-layer-error="${layer.id}"]`);
+      error.hidden = true;
       resetDepthSlider();
 
-      if (!e.target.checked) {
-        hideSystem(systemId);
-        content.style.display = 'none';
-        scheduleUnload(systemId, content);
+      if (!input.checked) {
+        systems.forEach(systemId => {
+          hideSystem(systemId);
+          scheduleUnload(systemId, null);
+        });
         return;
       }
 
-      cancelUnload(systemId);
-
-      // Models are fetched on first activation, not upfront.
-      await ensureSystemLoaded(systemId, group);
-      showSystem(systemId);
-      content.style.display = 'block';
-
-      // Building the list here covers every activation path: clicking the
-      // checkbox, clicking the row, or keyboard activation.
-      if (content.children.length === 0) {
-        populateSystemStructures(systemId, content);
+      label.classList.add('loading');
+      label.setAttribute('aria-busy', 'true');
+      input.disabled = true;
+      try {
+        for (const systemId of systems) {
+          cancelUnload(systemId);
+          await ensureSystemLoaded(systemId);
+          showSystem(systemId);
+        }
+      } catch {
+        error.hidden = false;
+      } finally {
+        label.classList.remove('loading');
+        label.removeAttribute('aria-busy');
+        input.disabled = false;
+        syncLayerControls();
       }
     });
+  });
+
+  container.querySelector('#bodyRegionSelect')?.addEventListener('change', event => {
+    selectedRegion = event.target.value;
+    focusOnRegion(selectedRegion, state.viewer);
+  });
+
+  container.querySelector('#sidebarResetBtn')?.addEventListener('click', () => {
+    selectedRegion = 'full';
+    const regionSelect = container.querySelector('#bodyRegionSelect');
+    if (regionSelect) regionSelect.value = selectedRegion;
+    resetView(state.viewer);
+  });
+}
+
+function availableSystemsForLayer(layer) {
+  return (layer?.systems || []).filter(systemId => getSystemParts(systemId).length > 0);
+}
+
+function layerLabelForSystem(systemId, lang) {
+  const layer = ANATOMY_LAYERS.find(entry => entry.systems.includes(systemId));
+  return layer?.label[lang] || layer?.label.en || '';
+}
+
+function syncLayerControls() {
+  const container = document.getElementById('systemsList');
+  if (!container) return;
+
+  ANATOMY_LAYERS.forEach(layer => {
+    const input = container.querySelector(`[data-layer-toggle="${layer.id}"]`);
+    if (!input || input.disabled) return;
+
+    const systems = availableSystemsForLayer(layer);
+    const visibleCount = systems.filter(systemId =>
+      state.loadedSystems.includes(systemId) && getSystemVisibilityState(systemId).visible
+    ).length;
+    input.checked = systems.length > 0 && visibleCount === systems.length;
+    input.indeterminate = visibleCount > 0 && visibleCount < systems.length;
   });
 }
 
@@ -150,7 +161,7 @@ export async function selectStructureAnywhere(partId) {
     // the timer would then dispose the geometry under the live selection.
     cancelUnload(systemId);
 
-    const groupEl = () => document.querySelector(`.system-group[data-system="${systemId}"]`);
+    const layer = ANATOMY_LAYERS.find(entry => entry.systems.includes(systemId));
     const loaded = state.loadedSystems.includes(systemId);
     // Ask the scene rather than the checkbox: the checkbox is a rendering of
     // this answer and can be older than it. A system with anything still on
@@ -159,22 +170,18 @@ export async function selectStructureAnywhere(partId) {
     const hidden = loaded && !getSystemVisibilityState(systemId).visible;
 
     if (!loaded || hidden) {
-      if (!loaded) await ensureSystemLoaded(systemId, groupEl());
-
-      // Re-read the row after the await: it may have been rebuilt while the
-      // model was in flight.
-      const group = groupEl();
-      const checkbox = group?.querySelector('[data-system-checkbox]');
-      const content = group?.querySelector('.system-group-content');
-      if (checkbox) checkbox.checked = true;
-      if (content) {
-        content.style.display = 'block';
-        if (content.children.length === 0) populateSystemStructures(systemId, content);
+      try {
+        if (!loaded) await ensureSystemLoaded(systemId);
+        showSystem(systemId);
+      } catch {
+        const error = layer && document.querySelector(`[data-layer-error="${layer.id}"]`);
+        if (error) error.hidden = false;
+        return false;
       }
-      showSystem(systemId);
     }
   }
 
+  syncLayerControls();
   return selectPartById(partId, state.viewer);
 }
 
@@ -201,35 +208,19 @@ function cancelUnload(systemId) {
 
 const pendingSystemLoads = new Map();
 
-async function ensureSystemLoaded(systemId, group) {
+async function ensureSystemLoaded(systemId) {
   if (state.loadedSystems.includes(systemId)) return;
 
   if (!pendingSystemLoads.has(systemId)) {
-    const label = group?.querySelector('.system-group-label');
-    const counter = label?.querySelector('.system-count');
-    const originalCount = counter?.textContent;
-    label?.classList.add('loading');
-
-    // The bytes were already being measured and thrown away; show them.
-    const unsubscribe = subscribe('loading', info => {
-      if (!counter || info.system !== systemId || info.loaded) return;
-      counter.textContent = info.total
-        ? `${Math.round(info.loaded / 1048576 * 10) / 10}/${Math.round(info.total / 1048576 * 10) / 10} MB`
-        : `${Math.round(info.loaded / 1048576 * 10) / 10} MB`;
-    });
-
     const promise = loadModel(systemId, state.viewer)
       .catch(error => {
         console.error(`[sidebar] Failed to load ${systemId}:`, error);
-        label?.classList.add('failed');
-        if (counter) counter.textContent = translate('retry');
+        const layerId = ANATOMY_LAYERS.find(layer => layer.systems.includes(systemId))?.id;
+        const message = layerId && document.querySelector(`[data-layer-error="${layerId}"]`);
+        if (message) message.hidden = false;
+        throw error;
       })
       .finally(() => {
-        unsubscribe?.();
-        label?.classList.remove('loading');
-        if (counter && originalCount && !label?.classList.contains('failed')) {
-          counter.textContent = originalCount;
-        }
         pendingSystemLoads.delete(systemId);
       });
 
@@ -237,174 +228,6 @@ async function ensureSystemLoaded(systemId, group) {
   }
 
   await pendingSystemLoads.get(systemId);
-}
-
-const ROWS_PER_CHUNK = 60;
-
-// Each rendered list keeps its roving-tabindex refresher, called as chunks land.
-const rovingRefreshers = new WeakMap();
-
-// One row per structure rather than per mesh: the left and right copies of the
-// same structure share a row and are picked with a side chip.
-function groupSystemStructures(systemId, lang) {
-  const groups = new Map();
-
-  getSystemParts(systemId).forEach(partId => {
-    const info = getStructureInfo(partId) || {};
-    const base = info.baseName || partId;
-
-    let group = groups.get(base);
-    if (!group) {
-      group = {
-        base,
-        label: (info.name?.[lang] || info.name?.en || base).replace(/\s*\((sinistro|destro|left|right)\)$/i, ''),
-        parts: [],
-        sides: {}
-      };
-      groups.set(base, group);
-    }
-
-    group.parts.push(partId);
-    group.sides[info.side || 'none'] = partId;
-  });
-
-  return [...groups.values()];
-}
-
-function rowMarkup(group) {
-  const primary = group.sides.none || group.sides.right || group.sides.left;
-  const visible = group.parts.some(id => state.partStates.get(id)?.visible !== false);
-  const selected = group.parts.some(id => state.partStates.get(id)?.selected === true);
-
-  const sides = ['left', 'right']
-    .filter(side => group.sides[side])
-    .map(side => `<button type="button" class="structure-side" data-select="${escapeHtml(group.sides[side])}" title="${translate(side === 'left' ? 'side_left' : 'side_right')}">${translate(side === 'left' ? 'side_left_short' : 'side_right_short')}</button>`)
-    .join('');
-
-  const label = escapeHtml(group.label);
-
-  return `
-    <div class="structure-item ${selected ? 'selected' : ''}" role="option" tabindex="-1" aria-selected="${selected}" data-part="${escapeHtml(primary)}" data-parts="${escapeHtml(group.parts.join('|'))}">
-      <input type="checkbox" ${visible ? 'checked' : ''} data-part-checkbox="${escapeHtml(primary)}">
-      <span class="structure-name" title="${label}">${label}</span>
-      <span class="structure-sides">${sides}</span>
-      <div class="structure-actions">
-        <button class="action-btn isolate" data-action="isolate" title="${escapeHtml(translate('isolate'))}" aria-label="${escapeHtml(translate('isolate'))}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-        <button class="action-btn hide" data-action="hide" title="${escapeHtml(translate('hide'))}" aria-label="${escapeHtml(translate('hide'))}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19M2 2l20 20"/></svg>
-        </button>
-        <button class="action-btn transparent" data-action="transparent" title="${escapeHtml(translate('transparent'))}" aria-label="${escapeHtml(translate('transparent'))}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
-        </button>
-      </div>
-    </div>
-  `;
-}
-
-function populateSystemStructures(systemId, container) {
-  const lang = state.language || 'it';
-  const groups = groupSystemStructures(systemId, lang);
-
-  // A 669-structure system used to build ~10 000 nodes and ~2700 listeners in
-  // one go. Rows arrive in chunks as the panel is scrolled, behind a single
-  // delegated listener.
-  let rendered = 0;
-  container.innerHTML = '';
-
-  const sentinel = document.createElement('div');
-  sentinel.className = 'structure-sentinel';
-
-  const renderChunk = () => {
-    const slice = groups.slice(rendered, rendered + ROWS_PER_CHUNK);
-    if (!slice.length) return;
-
-    sentinel.insertAdjacentHTML('beforebegin', slice.map(rowMarkup).join(''));
-    rendered += slice.length;
-    rovingRefreshers.get(container)?.();
-
-    if (rendered >= groups.length) {
-      observer.disconnect();
-      sentinel.remove();
-    }
-  };
-
-  const observer = new IntersectionObserver(entries => {
-    if (entries.some(entry => entry.isIntersecting)) renderChunk();
-  }, { root: container.closest('.sidebar-content'), rootMargin: '200px' });
-
-  container.setAttribute('role', 'listbox');
-  container.setAttribute('aria-label', translate('systems'));
-
-  container.appendChild(sentinel);
-  renderChunk();
-  observer.observe(sentinel);
-
-  container.addEventListener('click', onStructureListClick);
-  container.addEventListener('change', onStructureListChange);
-
-  // One tab stop for the whole list; the arrows move between rows. 669 rows
-  // would otherwise be 669 stops.
-  const refreshRoving = rovingList(container, {
-    itemSelector: '.structure-item',
-    onActivate: item => selectPartById(item.dataset.part, state.viewer)
-  });
-  refreshRoving();
-  rovingRefreshers.set(container, refreshRoving);
-}
-
-function partsOf(item) {
-  return (item.dataset.parts || item.dataset.part || '').split('|').filter(Boolean);
-}
-
-function onStructureListChange(event) {
-  const checkbox = event.target.closest('[data-part-checkbox]');
-  if (!checkbox) return;
-
-  const item = checkbox.closest('.structure-item');
-  partsOf(item).forEach(partId => {
-    if (checkbox.checked) showPart(partId); else hidePart(partId);
-  });
-}
-
-function onStructureListClick(event) {
-  const item = event.target.closest('.structure-item');
-  if (!item) return;
-
-  const side = event.target.closest('[data-select]');
-  if (side) {
-    event.stopPropagation();
-    selectPartById(side.dataset.select, state.viewer);
-    return;
-  }
-
-  const action = event.target.closest('[data-action]')?.dataset.action;
-  const parts = partsOf(item);
-  const primary = item.dataset.part;
-
-  if (action === 'isolate') {
-    event.stopPropagation();
-    isolatePart(primary);
-    return;
-  }
-
-  if (action === 'hide') {
-    event.stopPropagation();
-    parts.forEach(hidePart);
-    deselectPart();
-    return;
-  }
-
-  if (action === 'transparent') {
-    event.stopPropagation();
-    const opacity = getPartVisibility(primary).opacity < 1 ? 1 : 0.3;
-    parts.forEach(partId => setPartTransparency(partId, opacity));
-    return;
-  }
-
-  if (event.target.type === 'checkbox') return;
-  selectPartById(primary, state.viewer);
 }
 
 function getPartVisibility(partId) {
@@ -535,7 +358,7 @@ export function initSearch() {
     const query = e.target.value.toLowerCase().trim();
     if (query.length < 2) {
       results.innerHTML = '';
-      results.classList.remove('show');
+      closeResults();
       return;
     }
 
@@ -558,7 +381,7 @@ export function initSearch() {
           <div class="search-result-item${pending}" role="option" id="search-option-${index}" aria-selected="false" data-part="${escapeHtml(target)}">
             <span class="result-name">${escapeHtml(row.label)}</span>
             <span class="result-sides">${sides}</span>
-            <span class="result-system">${escapeHtml(systemLabel(row.system, lang))}</span>
+            <span class="result-system">${escapeHtml(layerLabelForSystem(row.system, lang))}</span>
           </div>
         `;
       }).join('');
@@ -568,7 +391,7 @@ export function initSearch() {
       const choose = async (partId) => {
         input.value = '';
         results.innerHTML = '';
-        results.classList.remove('show');
+        closeResults();
         input.blur();
         await selectStructureAnywhere(partId);
       };
@@ -588,7 +411,7 @@ export function initSearch() {
   // Close results on click outside
   document.addEventListener('click', (e) => {
     if (!input.contains(e.target) && !results.contains(e.target)) {
-      results.classList.remove('show');
+      closeResults();
     }
   });
 
@@ -677,7 +500,10 @@ function debounce(fn, delay) {
 // State change handlers
 subscribe('selectedPart', onSelectionChange);
 subscribe('language', onLanguageChange);
-subscribe('partStates', onPartStatesChange);
+subscribe('partStates', syncLayerControls);
+subscribe('systemShown', syncLayerControls);
+subscribe('systemHidden', syncLayerControls);
+subscribe('allPartsRestored', syncLayerControls);
 
 function onSelectionChange(part) {
   // Update sidebar highlights
@@ -708,22 +534,6 @@ function onLanguageChange(lang) {
   }
 }
 
-function onPartStatesChange(partStates) {
-  // Update checkboxes in sidebar
-  partStates.forEach((partState, partId) => {
-    const checkbox = document.querySelector(`[data-part-checkbox="${partId}"]`);
-    if (checkbox) {
-      checkbox.checked = partState.visible !== false;
-    }
-
-    const item = document.querySelector(`.structure-item[data-part="${partId}"]`);
-    if (item) {
-      item.classList.toggle('hidden', partState.visible === false);
-      item.style.opacity = partState.opacity < 1 ? '0.5' : '1';
-    }
-  });
-}
-
 function updateFooterButtons(part) {
   const footer = document.getElementById('footerBar');
   if (!footer) return;
@@ -746,6 +556,7 @@ function updateFooterButtons(part) {
 
 function updateUIText(lang) {
   const t = (key) => translate(key, lang);
+  const copy = SIDEBAR_COPY[lang] || SIDEBAR_COPY.en;
 
   // Assistive technology takes pronunciation and language from the document,
   // not from the picker in the header.
@@ -753,7 +564,18 @@ function updateUIText(lang) {
 
   // Update placeholders
   const searchInput = document.getElementById('searchInput');
-  if (searchInput) searchInput.placeholder = t('search_placeholder');
+  if (searchInput) {
+    searchInput.placeholder = copy.searchPlaceholder;
+    searchInput.setAttribute('aria-label', copy.searchLabel);
+  }
+  const searchLabel = document.getElementById('sidebarSearchLabel');
+  if (searchLabel) searchLabel.textContent = copy.searchLabel;
+  const sidebarHeading = document.querySelector('.sidebar-systems .sidebar-header h2');
+  if (sidebarHeading) sidebarHeading.textContent = copy.heading;
+  const collapseButton = document.getElementById('sidebarCollapse');
+  if (collapseButton) {
+    collapseButton.setAttribute('aria-label', document.getElementById('app')?.classList.contains('anatomy-collapsed') ? copy.expand : copy.collapse);
+  }
 
   // Update button titles
   const updates = [
@@ -782,9 +604,6 @@ function updateUIText(lang) {
   });
 
   // Update sidebar headers
-  const systemsHeader = document.querySelector('.sidebar-systems .sidebar-header h2');
-  if (systemsHeader) systemsHeader.textContent = t('systems');
-
   const infoHeader = document.querySelector('.sidebar-info .sidebar-header h2');
   if (infoHeader) infoHeader.textContent = t('info');
 
@@ -804,39 +623,38 @@ function updateUIText(lang) {
 // Initialize all UI
 export async function initUI(viewer) {
   await loadAllData();
-  // The markup is written in English; anything else comes from the dictionaries.
   updateUIText(state.language);
   initSystemsSidebar();
+  initSidebarCollapse();
   initToolbar(viewer);
   initFooterActions(viewer);
   initHelpModal();
   initLanguageSelector();
   initSearch();
   initDrawers();
-  initMobileSearch();
   initDepthSlider();
 }
 
-// Under 1024px the search field is hidden; this button is the only way to it.
-function initMobileSearch() {
-  const button = document.getElementById('searchOpen');
-  const header = document.querySelector('.header');
-  const input = document.getElementById('searchInput');
-  if (!button || !header || !input) return;
+function initSidebarCollapse() {
+  const app = document.getElementById('app');
+  const button = document.getElementById('sidebarCollapse');
+  const content = document.getElementById('systemsContent');
+  const desktopQuery = window.matchMedia('(min-width: 1025px)');
+  if (!app || !button || !content) return;
+
+  function setCollapsed(collapsed) {
+    const isCollapsed = desktopQuery.matches && collapsed;
+    app.classList.toggle('anatomy-collapsed', isCollapsed);
+    button.setAttribute('aria-expanded', String(!isCollapsed));
+    button.setAttribute('aria-label', SIDEBAR_COPY[state.language]?.[isCollapsed ? 'expand' : 'collapse'] || SIDEBAR_COPY.en[isCollapsed ? 'expand' : 'collapse']);
+    setInert(content, isCollapsed);
+  }
 
   button.addEventListener('click', () => {
-    const open = header.classList.toggle('search-open');
-    button.setAttribute('aria-expanded', String(open));
-    if (open) input.focus();
+    setCollapsed(!app.classList.contains('anatomy-collapsed'));
   });
-
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Escape') {
-      header.classList.remove('search-open');
-      button.setAttribute('aria-expanded', 'false');
-      input.blur();
-    }
-  });
+  desktopQuery.addEventListener('change', () => setCollapsed(false));
+  setCollapsed(false);
 }
 
 // On narrow layouts both sidebars slide off-canvas; these wire the header

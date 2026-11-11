@@ -566,12 +566,6 @@ body {
   letter-spacing: -0.5px;
 }
 
-.header-center {
-  flex: 1;
-  max-width: 500px;
-  margin: 0 32px;
-}
-
 .search-container {
   position: relative;
   width: 100%;
@@ -579,7 +573,7 @@ body {
 
 .search-input {
   width: 100%;
-  padding: 8px 12px 8px 40px;
+  padding: 9px 12px;
   background: var(--bg-tertiary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -599,34 +593,18 @@ body {
   box-shadow: 0 0 0 3px var(--accent-dim);
 }
 
-.search-input::before {
-  content: '';
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E") center/contain no-repeat;
-  pointer-events: none;
-}
-
 .search-results {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  position: static;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px var(--shadow-strong);
-  max-height: 300px;
+  max-height: 260px;
   overflow-y: auto;
-  z-index: 100;
   display: none;
+  margin-top: 6px;
 }
 
-.search-results:not(:empty) {
+.search-results.show {
   display: block;
 }
 
@@ -843,6 +821,10 @@ body {
   display: none;
 }
 
+.sidebar-drawer-toggle {
+  display: none;
+}
+
 .sidebar-toggle {
   width: 32px;
   height: 32px;
@@ -876,63 +858,150 @@ body {
   grid-row: 1;
 }
 
-.system-group {
-  margin-bottom: 16px;
+.sidebar-systems .sidebar-header h2 {
+  color: var(--fg-primary);
+  font-size: 17px;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
-.system-group-label {
-  display: flex;
+.anatomy-sidebar-content {
+  padding: 16px;
+}
+
+.sidebar-search {
+  margin-bottom: 18px;
+}
+
+.sidebar-search > label,
+.anatomy-region > label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.anatomy-layers {
+  display: grid;
+  gap: 7px;
+  border: 0;
+  min-width: 0;
+}
+
+.anatomy-layer-option {
+  min-width: 0;
+}
+
+.anatomy-layer {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 2px 10px;
+  padding: 10px 11px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
-  user-select: none;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
-.system-group-label:hover {
+.anatomy-layer:hover:not(:has(input:disabled)) {
   background: var(--bg-hover);
+  border-color: var(--border-hover);
 }
 
-.system-group-label input[type="checkbox"] {
+.anatomy-layer input[type="checkbox"] {
+  grid-row: 1 / span 2;
   width: 18px;
   height: 18px;
   accent-color: var(--accent);
   cursor: pointer;
-  flex-shrink: 0;
 }
 
-.system-group-label span {
-  flex: 1;
+.anatomy-layer input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.anatomy-layer-name {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
 }
 
-/* Shown while the system's GLB is being fetched on first activation. */
-.system-group-label.loading {
+.layer-unavailable,
+.layer-error {
+  grid-column: 2;
+  color: var(--fg-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.layer-error {
+  display: block;
+  margin: 5px 10px 0 41px;
+  color: var(--danger);
+}
+
+.layer-error[hidden] {
+  display: none;
+}
+
+.anatomy-layer.loading {
   opacity: 0.6;
   cursor: progress;
 }
 
-.system-group-label.loading .system-count::after {
-  content: ' ...';
+.anatomy-region {
+  margin-top: 20px;
 }
 
-.system-group-label .system-count {
-  font-size: 11px;
-  color: var(--fg-muted);
-  background: var(--bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 10px;
-  font-weight: 500;
+.anatomy-region select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--fg-primary);
+  font: inherit;
 }
 
-.system-group-content {
-  padding-left: 28px;
-  margin-top: 4px;
-  border-left: 1px solid var(--border);
-  margin-left: 9px;
+.anatomy-reset {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.anatomy-reset:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+#app.anatomy-collapsed .main-layout {
+  grid-template-columns: 48px minmax(0, 1fr) var(--info-width);
+}
+
+#app.anatomy-collapsed .sidebar-systems .sidebar-header {
+  justify-content: center;
+  padding: 8px;
+}
+
+#app.anatomy-collapsed .sidebar-systems .sidebar-header h2,
+#app.anatomy-collapsed #systemsContent {
+  display: none;
+}
+
+#app.anatomy-collapsed .sidebar-collapse-toggle svg {
+  transform: rotate(180deg);
 }
 
 .structure-item {
@@ -1698,6 +1767,15 @@ body {
     grid-template-rows: 1fr;
   }
 
+  #app.anatomy-collapsed .main-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #app.anatomy-collapsed .sidebar-systems .sidebar-header h2,
+  #app.anatomy-collapsed #systemsContent {
+    display: revert;
+  }
+
   /* The sidebars leave the grid here, so the viewer takes the only column. */
   .viewer-section {
     grid-column: 1;
@@ -1734,6 +1812,14 @@ body {
     display: flex !important;
   }
 
+  .sidebar-collapse-toggle {
+    display: none !important;
+  }
+
+  .sidebar-drawer-toggle {
+    display: flex !important;
+  }
+
   /* Below this width the sidebars are off-canvas drawers, so the header needs
      a way to bring them back. */
   .drawer-open {
@@ -1763,36 +1849,6 @@ body {
     display: none;
   }
 
-  .header-center {
-    display: none;
-  }
-
-  /* Driven by a class the search button sets. The previous rule keyed off
-     :focus inside an element it had itself hidden, so the field could never be
-     reached on a phone. */
-  .header.search-open .header-center {
-    display: block;
-    position: absolute;
-    top: calc(var(--header-height) + 8px);
-    left: 16px;
-    right: 16px;
-    max-width: none;
-    z-index: 100;
-    background: var(--bg-secondary);
-    padding: 12px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--border);
-    box-shadow: 0 8px 24px var(--shadow-strong);
-  }
-
-  .search-results {
-    position: static;
-    box-shadow: none;
-    border: none;
-    background: transparent;
-    max-height: 200px;
-    margin-top: 8px;
-  }
 }
 
 @media (max-width: 480px) {
